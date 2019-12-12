@@ -1,0 +1,14 @@
+name: "my-website"
+navbar:
+  title: "Alex Salamah Portfolio"
+  left:
+    - text: "Home"
+      href: index.html
+    - text: "About Me"
+      href: aboutme.html
+    - text: "Case Study 1"
+      href: EDAforProject1_R5_2.html
+    - text: "R Shiny APPS"
+      href: RshinyApps.html
+    - text: "Case Study 2"
+      href: Project2.html

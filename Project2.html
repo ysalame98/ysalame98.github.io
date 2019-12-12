@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+
+<html xmlns="http://www.w3.org/1999/xhtml">
+
+<head>
+
+<meta charset="utf-8" />
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<meta name="generator" content="pandoc" />
+<meta http-equiv="X-UA-Compatible" content="IE=EDGE" />
+
+<meta name="viewport" content="width=device-width, initial-scale=1">
+
+<meta name="author" content="Alex Salamah" />
+
+
+<title>Case Study: Employee Attrition</title>
+
+
+
+
+
+
+<link rel="stylesheet" href="Project2_files/style.css" type="text/css" />
+
+
+
+
+
+</head>
+
+<body>
+
+
+
+
+<header>
+<div class="inner">
+<h1 class="title toc-ignore">Case Study: Employee Attrition</h1>
+<h3 class="author">Alex Salamah</h3>
+<h3 class="date">Nov 2019</h3>
+</div>
+</header>
+
+
+
+<div id="content-wrapper">
+  <div class="inner clearfix">
+    <section id="main-content">
+<div id="define-the-goals" class="section level1">
+<h1>Define the Goals:</h1>
+<ul>
+<li><p>Using attrition Data Set, identify the top three factors that contribute to turnover/attrition. Also, explore job role specific trends that may exist in the data set (e.g., “Data Scientists have the highest job satisfaction”).</p></li>
+<li>build a model to predict attrition</li>
+<li><p>build a model to predict salaries</p></li>
+</ul>
+<div id="initial-meta-data-and-data-profiling-analysis" class="section level2">
+<h2>Initial Meta Data and Data Profiling Analysis</h2>
+<div id="variables-analysis" class="section level3">
+<h3>Variables Analysis:</h3>
+<p>Examining the Attrition dataset, we note that it consists of 870 observations and 36 attributes/variables. The original variables consisted of 27 integers and 9 factors.</p>
+<pre><code>## Skim summary statistics
+##  n obs: 870 
+##  n variables: 36 
+## 
+## -- Variable type:factor ----------------------------------------------------------------------------------------
+##        variable missing complete   n n_unique
+##       Attrition       0      870 870        2
+##  BusinessTravel       0      870 870        3
+##      Department       0      870 870        3
+##  EducationField       0      870 870        6
+##          Gender       0      870 870        2
+##         JobRole       0      870 870        9
+##   MaritalStatus       0      870 870        3
+##          Over18       0      870 870        1
+##        OverTime       0      870 870        2
+##                             top_counts ordered
+##               No: 730, Yes: 140, NA: 0   FALSE
+##     Tra: 618, Tra: 158, Non: 94, NA: 0   FALSE
+##     Res: 562, Sal: 273, Hum: 35, NA: 0   FALSE
+##  Lif: 358, Med: 270, Mar: 100, Tec: 75   FALSE
+##              Mal: 516, Fem: 354, NA: 0   FALSE
+##  Sal: 200, Res: 172, Lab: 153, Man: 87   FALSE
+##    Mar: 410, Sin: 269, Div: 191, NA: 0   FALSE
+##                          Y: 870, NA: 0   FALSE
+##               No: 618, Yes: 252, NA: 0   FALSE
+## 
+## -- Variable type:integer ---------------------------------------------------------------------------------------
+##                  variable missing complete   n     mean      sd   p0
+##                       Age       0      870 870    36.83    8.93   18
+##                 DailyRate       0      870 870   815.23  401.12  103
+##          DistanceFromHome       0      870 870     9.34    8.14    1
+##                 Education       0      870 870     2.9     1.02    1
+##             EmployeeCount       0      870 870     1       0       1
+##            EmployeeNumber       0      870 870  1029.83  604.79    1
+##   EnvironmentSatisfaction       0      870 870     2.7     1.1     1
+##                HourlyRate       0      870 870    65.61   20.13   30
+##                        ID       0      870 870   435.5   251.29    1
+##            JobInvolvement       0      870 870     2.72    0.7     1
+##                  JobLevel       0      870 870     2.04    1.09    1
+##           JobSatisfaction       0      870 870     2.71    1.11    1
+##             MonthlyIncome       0      870 870  6390.26 4597.7  1081
+##               MonthlyRate       0      870 870 14325.62 7108.38 2094
+##        NumCompaniesWorked       0      870 870     2.73    2.52    0
+##         PercentSalaryHike       0      870 870    15.2     3.68   11
+##         PerformanceRating       0      870 870     3.15    0.36    3
+##  RelationshipSatisfaction       0      870 870     2.71    1.1     1
+##             StandardHours       0      870 870    80       0      80
+##          StockOptionLevel       0      870 870     0.78    0.86    0
+##         TotalWorkingYears       0      870 870    11.05    7.51    0
+##     TrainingTimesLastYear       0      870 870     2.83    1.27    0
+##           WorkLifeBalance       0      870 870     2.78    0.71    1
+##            YearsAtCompany       0      870 870     6.96    6.02    0
+##        YearsInCurrentRole       0      870 870     4.2     3.64    0
+##   YearsSinceLastPromotion       0      870 870     2.17    3.19    0
+##      YearsWithCurrManager       0      870 870     4.14    3.57    0
+##      p25     p50      p75  p100     hist
+##    30       35      43       60 &lt;U+2581&gt;&lt;U+2583&gt;&lt;U+2586&gt;&lt;U+2587&gt;&lt;U+2585&gt;&lt;U+2583&gt;&lt;U+2582&gt;&lt;U+2582&gt;
+##   472.5    817.5  1165.75  1499 &lt;U+2586&gt;&lt;U+2586&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2586&gt;&lt;U+2587&gt;&lt;U+2587&gt;
+##     2        7      14       29 &lt;U+2587&gt;&lt;U+2585&gt;&lt;U+2583&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##     2        3       4        5 &lt;U+2582&gt;&lt;U+2585&gt;&lt;U+2581&gt;&lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2586&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##     1        1       1        1 &lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##   477.25  1039    1561.5   2064 &lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2586&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;
+##     2        3       4        4 &lt;U+2585&gt;&lt;U+2581&gt;&lt;U+2586&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2587&gt;
+##    48       66      83      100 &lt;U+2586&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2586&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;
+##   218.25   435.5   652.75   870 &lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;
+##     2        3       3        4 &lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2583&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##     1        2       3        5 &lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2583&gt;&lt;U+2581&gt;&lt;U+2582&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##     2        3       4        4 &lt;U+2585&gt;&lt;U+2581&gt;&lt;U+2585&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2587&gt;
+##  2839.5   4945.5  8182    19999 &lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2583&gt;&lt;U+2582&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##  8092    14074.5 20456.25 26997 &lt;U+2586&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2586&gt;&lt;U+2587&gt;&lt;U+2586&gt;
+##     1        2       4        9 &lt;U+2587&gt;&lt;U+2582&gt;&lt;U+2582&gt;&lt;U+2582&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##    12       14      18       25 &lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2583&gt;&lt;U+2583&gt;&lt;U+2581&gt;&lt;U+2582&gt;&lt;U+2582&gt;&lt;U+2581&gt;
+##     3        3       3        4 &lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2582&gt;
+##     2        3       4        4 &lt;U+2585&gt;&lt;U+2581&gt;&lt;U+2585&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2587&gt;
+##    80       80      80       80 &lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##     0        1       1        3 &lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2582&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##     6       10      15       40 &lt;U+2585&gt;&lt;U+2587&gt;&lt;U+2582&gt;&lt;U+2582&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##     2        3       3        6 &lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2587&gt;&lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2582&gt;&lt;U+2582&gt;&lt;U+2581&gt;
+##     2        3       3        4 &lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2583&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2587&gt;&lt;U+2581&gt;&lt;U+2582&gt;
+##     3        5      10       40 &lt;U+2587&gt;&lt;U+2585&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##     2        3       7       18 &lt;U+2587&gt;&lt;U+2582&gt;&lt;U+2581&gt;&lt;U+2585&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##     0        1       3       15 &lt;U+2587&gt;&lt;U+2582&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;
+##     2        3       7       17 &lt;U+2587&gt;&lt;U+2582&gt;&lt;U+2581&gt;&lt;U+2583&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;&lt;U+2581&gt;</code></pre>
+<p><img src="Project2_files/figure-html/unnamed-chunk-3-1.png" /><!-- --></p>
+</div>
+<div id="missing-values" class="section level3">
+<h3>Missing Values:</h3>
+<p>Analysis reveals that there are no missing values to be dealt with.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-4-1.png" /><!-- --></p>
+</div>
+<div id="data-profiling-analysis-and-categorical-imbalance" class="section level3">
+<h3>Data Profiling Analysis and Categorical imbalance</h3>
+<p>As illustrated in the charts below, some of the categorical variables appear to be imbalance. This may need to be dealt with prior to fitting the models.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-5-1.png" /><!-- --><img src="Project2_files/figure-html/unnamed-chunk-5-2.png" /><!-- --></p>
+</div>
+</div>
+<div id="variable-pruning" class="section level2">
+<h2>Variable pruning</h2>
+<p>variables that have SD=0, or have one value for example over18=Yes, or provide similar information will be removed from the data set as they are not providing any analytical value. Additional pruning was done using correlation analysis. Heat map was produced to remove attributes that are highly correlated.</p>
+</div>
+<div id="correlated-attributes" class="section level2">
+<h2>Correlated Attributes:</h2>
+<p>Identify correlated attributes using heat map and keep the one that has most influence on attrition</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-8-1.png" /><!-- --></p>
+</div>
+<div id="determine-which-of-the-numerical-discreet-and-continuous-attributes-are-important-to-attrition" class="section level2">
+<h2>Determine which of the numerical (discreet and continuous) attributes are important to attrition</h2>
+<div id="age" class="section level3">
+<h3>Age:</h3>
+<p>Age does not seem to have much impact on attrition where the average age of the employees that are is slightly lower than the average age of employees that are staying.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-9-1.png" /><!-- --><img src="Project2_files/figure-html/unnamed-chunk-9-2.png" /><!-- --><img src="Project2_files/figure-html/unnamed-chunk-9-3.png" /><!-- --></p>
+</div>
+<div id="years-at-company" class="section level3">
+<h3>Years At Company:</h3>
+<p>The age observation closely tracks with the years at the company. This attribute also shows slight significance as it relates to attrition. The density chart shows employees tend to mostly leave within years 1-3</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-10-1.png" /><!-- --></p>
+</div>
+<div id="years-with-current-manager" class="section level3">
+<h3>Years with current manager:</h3>
+<p>The number of years working with the same manager does not seem to have much impact on attrition.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-11-1.png" /><!-- --></p>
+</div>
+<div id="years-in-current-role" class="section level3">
+<h3>Years in current role:</h3>
+<p>The variable does not seem to have much impact on attrition</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-12-1.png" /><!-- --></p>
+</div>
+<div id="total-working-years" class="section level3">
+<h3>Total Working Years:</h3>
+<p>This variable seems to have some impact on attrition as the density graph shows the density for the yes and no categories are slightly off indicating some influence.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-13-1.png" /><!-- --></p>
+</div>
+<div id="monthly-income" class="section level3">
+<h3>Monthly Income:</h3>
+<p>This variable seems to have some impact on attrition as the density graph shows the density for the yes and no categories are slightly off indicating some influence. <img src="Project2_files/figure-html/unnamed-chunk-14-1.png" /><!-- --></p>
+</div>
+<div id="years-since-last-promotion" class="section level3">
+<h3>Years Since Last Promotion:</h3>
+<p>This variable does not seem to have some impact on attrition as the density graph shows the density for the yes and no categories are almost aligned indicating minimal Influence.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-15-1.png" /><!-- --></p>
+</div>
+<div id="distance-from-home" class="section level3">
+<h3>Distance from home:</h3>
+<p>This attribute appears to have an influence on attrition the density graph shows that people that have shorter commute have a higher probability of staying (not quitting)</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-16-1.png" /><!-- --></p>
+</div>
+<div id="number-of-companies-worked" class="section level3">
+<h3>Number Of Companies Worked:</h3>
+<p>Density chart for both attrition categories (Yes/No) is not much different based on the number of companies they’ve worked at. One exception is Employees who worked at one or two companies seem to have higher tendency to stay with the company.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-17-1.png" /><!-- --></p>
+</div>
+<div id="percent-salary-hike" class="section level3">
+<h3>Percent Salary Hike:</h3>
+<p>Density chart for both attrition categories (Yes/No) is not much different based on percentage salary hike they’ve received.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-18-1.png" /><!-- --></p>
+</div>
+<div id="performance-rating" class="section level3">
+<h3>Performance Rating:</h3>
+<p>Density chart for both attrition categories (Yes/No) is not much different based on the performance rating. One exception is the employees the received a performance rating between 3.0 and 3.125 have tendency to stay with the company.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-19-1.png" /><!-- --><img src="Project2_files/figure-html/unnamed-chunk-19-2.png" /><!-- --></p>
+</div>
+<div id="education-level" class="section level3">
+<h3>Education Level :</h3>
+<p>Density chart for both attrition categories (Yes/No) is not much different based on the Education Level. One exception is the employees the received a four years degree have tendency to stay with the company.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-21-1.png" /><!-- --></p>
+</div>
+<div id="relationship-satisfaction" class="section level3">
+<h3>Relationship Satisfaction:</h3>
+<p>Density chart for both attrition categories (Yes/No) indicate that employee with higher relationship satisfaction, 3 and 4, tend to stay with the company.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-22-1.png" /><!-- --></p>
+</div>
+<div id="relationship-satisfaction-1" class="section level3">
+<h3>Relationship Satisfaction:</h3>
+<p>Density chart for both attrition categories (Yes/No) indicate that employee with stock option levels of 1 and 2 have a much higher retention rate and tend to stay with the company.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-23-1.png" /><!-- --></p>
+</div>
+<div id="work-life-balance" class="section level3">
+<h3>Work Life Balance:</h3>
+<p>Density chart for both attrition categories (Yes/No) for Work Life Balance is quite similar with the exception for level 3 have a higher retention rate and tend to stay with the company.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-24-1.png" /><!-- --></p>
+</div>
+<div id="job-level" class="section level3">
+<h3>Job Level:</h3>
+<p>Density chart for both attrition categories (Yes/No) for Job Level is quite different especially for levels 1, 2 and 4.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-25-1.png" /><!-- --></p>
+</div>
+<div id="environment-satisfaction" class="section level3">
+<h3>Environment Satisfaction:</h3>
+<p>Density chart for both attrition categories (Yes/No) for Environment Satisfaction is quite different especially for levels 2, 3 and 4. The more satisfaction the higher the retention.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-26-1.png" /><!-- --></p>
+</div>
+<div id="job-involvement" class="section level3">
+<h3>Job Involvement:</h3>
+<p>Density chart for both attrition categories (Yes/No) for Job Involvement is somewhat similar the exception is for Job Involvement level 4, those employees have a much higher retention.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-27-1.png" /><!-- --></p>
+</div>
+<div id="job-satisfaction" class="section level3">
+<h3>Job Satisfaction:</h3>
+<p>Density chart for both attrition categories (Yes/No) for Job satisfaction is very similar the exception is for Job satisfaction levels 3 and 4 those employees have a higher retention.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-28-1.png" /><!-- --></p>
+</div>
+<div id="number-of-training-classes" class="section level3">
+<h3>Number of Training classes:</h3>
+<p>Density chart for both attrition categories (Yes/No) for Job Involvement is somewhat similar the exception is for employees who to 3 classes, those employees have a much higher retention.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-29-1.png" /><!-- --></p>
+<!-- # Correlation Heat Map: -->
+<!-- After the removal of correlated variables, the following heat map show the correlation of numerical attributes. -->
+<!-- ```{r, echo= FALSE} -->
+<!-- NumMainAttrDF %>% cor %>% corrplot("upper", addCoef.col = "black", number.digits = 2, -->
+<!--             number.cex = 0.7, method="square", -->
+<!--             order="hclust", title="Variable Corr Heat map", -->
+<!--             tl.srt=45, tl.cex = 0.8) -->
+<!-- ``` -->
+</div>
+</div>
+<div id="categorical-analysis" class="section level2">
+<h2>Categorical Analysis</h2>
+<div id="attrition-by-dept" class="section level3">
+<h3>Attrition by Dept:</h3>
+<p>Attrition level for the various dept is consistent and thus does not appear to be relevant to attrition</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-30-1.png" /><!-- --></p>
+</div>
+<div id="attrition-by-education-field" class="section level3">
+<h3>Attrition By Education Field:</h3>
+<p>Attrition across the various education level is consistent and thus does not appear to be relevant to attrition</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-31-1.png" /><!-- --></p>
+</div>
+<div id="attrition-by-gender" class="section level3">
+<h3>Attrition By Gender:</h3>
+<p>Attrition for both is consistent and thus does not appear to be relevant to attrition</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-32-1.png" /><!-- --></p>
+</div>
+<div id="attrition-by-job-role" class="section level3">
+<h3>Attrition By Job Role:</h3>
+<p>This variable appears to play a significant role in attrition whereby the Sales Representative have a high attrition rate of 45.3% nearly twice as high the next job role of Human resources which has a rate of 22.2%.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-33-1.png" /><!-- --></p>
+</div>
+<div id="attrition-by-marital-status" class="section level3">
+<h3>Attrition By Marital Status:</h3>
+<p>This variable appears to play a significant role in attrition whereby the singles have a high attrition rate of 26.0% nearly twice as high the married which has a rate of 14.1%.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-34-1.png" /><!-- --></p>
+</div>
+<div id="attrition-by-over-time-status" class="section level3">
+<h3>Attrition By Over Time Status:</h3>
+<p>This variable appears to play a significant role in attrition whereby over time employees have a high attrition rate of 31.7% are three times as likely to be attrition as non-overtime employees at 9.7%.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-35-1.png" /><!-- --></p>
+</div>
+<div id="attrition-by-stock-option-level" class="section level3">
+<h3>Attrition By Stock Option Level:</h3>
+<p>This variable appears to play a significant role in attrition whereby employees receiving no stock options (level 0) and those who receive the highest option (level = 3) have a high attrition rate the is almost three times that of employees the receive stock options at level 1 and 2.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-36-1.png" /><!-- --></p>
+</div>
+<div id="attrition-by-work-life-balance" class="section level3">
+<h3>Attrition By Work Life Balance:</h3>
+<p>The majority of work-life balance categories have similar attrition rates.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-37-1.png" /><!-- --></p>
+</div>
+<div id="attrition-by-job-level" class="section level3">
+<h3>Attrition By Job Level:</h3>
+<p>This variable appears to play a significant role in attrition whereby the various job levels have drastically different attrition rates.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-38-1.png" /><!-- --></p>
+</div>
+<div id="attrition-by-environment-satisfaction" class="section level3">
+<h3>Attrition By Environment Satisfaction:</h3>
+<p>The attrition rate is mostly consistent across the various levels</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-39-1.png" /><!-- --></p>
+</div>
+<div id="attrition-by-job-involvement" class="section level3">
+<h3>Attrition By Job Involvement:</h3>
+<p>This variable appears to play a significant role in attrition whereby employees receiving low job involvement (level 1) are 4 times as likely to be attrition (46.9%) as those in the next level of job involvement whose attrition rate is (19.3%)</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-40-1.png" /><!-- --></p>
+</div>
+<div id="attrition-by-job-satisfaction" class="section level3">
+<h3>Attrition by Job Satisfaction:</h3>
+<p>This variable does not seem to have minimal influence on attrition.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-41-1.png" /><!-- --></p>
+</div>
+<div id="attrition-by-training-times-last-year" class="section level3">
+<h3>Attrition by Training Times Last Year:</h3>
+<p>This variable appears to play a significant role in attrition whereby employees receiving different levels of training have different attrition rates.</p>
+<p><img src="Project2_files/figure-html/unnamed-chunk-42-1.png" /><!-- --></p>
+</div>
+<div id="classify-using-the-knn" class="section level3">
+<h3>Classify using the KNN:</h3>
+<p>I tried using Under sample, Over Sample and both none of the balanced training data produced the desired effect, to I decided to use the original data set. Using the analysis of the categorical and continuous variables conducted above, the following variables were selected to fit a KNN Model: StockOptionLevel, DistanceFromHome, MonthlyIncome, JobInvolvement. Through multiple iteration of K, Seed optimization, and different train/test split ratios the following parameters were the most optimal: K= 7, Split = 85%, and Seed = 100. With these parameters, the model was fitted and trained and the below are the outcomes: prediction Accuracy = 86.1%, Specificity = 75% Sensitivity = 86.5%</p>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##      classifications
+##        No Yes
+##   No  109   1
+##   Yes  17   3
+##                                         
+##                Accuracy : 0.8615        
+##                  95% CI : (0.79, 0.9158)
+##     No Information Rate : 0.9692        
+##     P-Value [Acc &gt; NIR] : 1.000000      
+##                                         
+##                   Kappa : 0.2095        
+##                                         
+##  Mcnemar&#39;s Test P-Value : 0.000407      
+##                                         
+##             Sensitivity : 0.8651        
+##             Specificity : 0.7500        
+##          Pos Pred Value : 0.9909        
+##          Neg Pred Value : 0.1500        
+##              Prevalence : 0.9692        
+##          Detection Rate : 0.8385        
+##    Detection Prevalence : 0.8462        
+##       Balanced Accuracy : 0.8075        
+##                                         
+##        &#39;Positive&#39; Class : No            
+## </code></pre>
+<p><img src="Project2_files/figure-html/unnamed-chunk-43-1.png" /><!-- --><img src="Project2_files/figure-html/unnamed-chunk-43-2.png" /><!-- --><img src="Project2_files/figure-html/unnamed-chunk-43-3.png" /><!-- --> ### Predict the Attrition from File</p>
+</div>
+</div>
+<div id="naive-bayes-model" class="section level2">
+<h2>Naive-Bayes Model:</h2>
+<p>This model produced similar results as the KNN model but the accuracy was lower, 82% versus 86% and the specificity came out to be 0. As a result, I decided to use the KNN model.</p>
+<pre><code>## Confusion Matrix and Statistics
+## 
+##      
+##        No Yes
+##   No  107   3
+##   Yes  20   0
+##                                           
+##                Accuracy : 0.8231          
+##                  95% CI : (0.7465, 0.8844)
+##     No Information Rate : 0.9769          
+##     P-Value [Acc &gt; NIR] : 1.0000000       
+##                                           
+##                   Kappa : -0.0418         
+##                                           
+##  Mcnemar&#39;s Test P-Value : 0.0008492       
+##                                           
+##             Sensitivity : 0.8425          
+##             Specificity : 0.0000          
+##          Pos Pred Value : 0.9727          
+##          Neg Pred Value : 0.0000          
+##              Prevalence : 0.9769          
+##          Detection Rate : 0.8231          
+##    Detection Prevalence : 0.8462          
+##       Balanced Accuracy : 0.4213          
+##                                           
+##        &#39;Positive&#39; Class : No              
+## </code></pre>
+</div>
+<div id="linear-regression" class="section level2">
+<h2>Linear Regression</h2>
+<div id="validate-assumptions" class="section level3">
+<h3>Validate assumptions:</h3>
+<p>The GGPLOTS and point plots confirm the assumptions. There is no evidence against normal distributions. There does not seem to be much evidence against a linear relationship between the means and there does not seem to be much evidence of non-constant standard deviation of the normal distributions.</p>
+<pre><code>## 
+## Attaching package: &#39;Metrics&#39;</code></pre>
+<pre><code>## The following objects are masked from &#39;package:caret&#39;:
+## 
+##     precision, recall</code></pre>
+<p><img src="Project2_files/figure-html/unnamed-chunk-46-1.png" /><!-- --><img src="Project2_files/figure-html/unnamed-chunk-46-2.png" /><!-- --><img src="Project2_files/figure-html/unnamed-chunk-46-3.png" /><!-- --><img src="Project2_files/figure-html/unnamed-chunk-46-4.png" /><!-- --><img src="Project2_files/figure-html/unnamed-chunk-46-5.png" /><!-- --><img src="Project2_files/figure-html/unnamed-chunk-46-6.png" /><!-- --></p>
+</div>
+<div id="fit-the-linear-regression-model-using-significant-variables-identified-above.-specifically" class="section level3">
+<h3>Fit the Linear Regression Model using significant variables identified above. Specifically:</h3>
+<ul>
+<li>Years At company</li>
+<li>Total Working Years</li>
+<li>Job Level</li>
+</ul>
+<pre><code>## [1] 1379.319</code></pre>
+<pre><code>## 
+## Call:
+## lm(formula = MonthlyIncome ~ YearsAtCompany + TotalWorkingYears + 
+##     JobLevel, data = NumMainAttrDF)
+## 
+## Residuals:
+##     Min      1Q  Median      3Q     Max 
+## -5625.1  -888.5    42.3   725.5  3968.3 
+## 
+## Coefficients:
+##                   Estimate Std. Error t value Pr(&gt;|t|)    
+## (Intercept)       -1764.37     100.04 -17.637  &lt; 2e-16 ***
+## YearsAtCompany      -32.04      10.11  -3.170  0.00158 ** 
+## TotalWorkingYears    70.76      11.07   6.394 2.64e-10 ***
+## JobLevel           3724.98      68.94  54.035  &lt; 2e-16 ***
+## ---
+## Signif. codes:  0 &#39;***&#39; 0.001 &#39;**&#39; 0.01 &#39;*&#39; 0.05 &#39;.&#39; 0.1 &#39; &#39; 1
+## 
+## Residual standard error: 1383 on 866 degrees of freedom
+## Multiple R-squared:  0.9099, Adjusted R-squared:  0.9096 
+## F-statistic:  2915 on 3 and 866 DF,  p-value: &lt; 2.2e-16</code></pre>
+<pre><code>##                         2.5 %      97.5 %
+## (Intercept)       -1960.72215 -1568.02112
+## YearsAtCompany      -51.87443   -12.20068
+## TotalWorkingYears    49.04284    92.48534
+## JobLevel           3589.67851  3860.28464</code></pre>
+</div>
+<div id="predict-salary" class="section level3">
+<h3>Predict Salary</h3>
+</div>
+</div>
+</div>
+    </section>
+  </div>
+</div>
+
+
+
+<!-- dynamically load mathjax for compatibility with self-contained -->
+<script>
+  (function () {
+    var script = document.createElement("script");
+    script.type = "text/javascript";
+    script.src  = "https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML";
+    document.getElementsByTagName("head")[0].appendChild(script);
+  })();
+</script>
+
+</body>
+</html>

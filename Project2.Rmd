@@ -1,0 +1,911 @@
+---
+title: 'Case Study: Employee Attrition'
+author: "Alex Salamah"
+date: "Nov 2019"
+output:
+  prettydoc::html_pretty:
+    theme: architect
+    highlight: github
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Define the Goals:
+
+* Using attrition Data Set, identify the top three factors that contribute to turnover/attrition.  Also, explore job role specific trends that may exist in the data set (e.g., “Data Scientists have the highest job satisfaction”). 
+
+* build a model to predict attrition
+* build a model to predict salaries
+
+
+```{r, include=FALSE}
+# Visualization
+library(tidyverse)
+library(plotly)
+library(plyr)
+library(dplyr)
+library(maps)
+library(skimr)
+library(inspectdf)
+library(VIM)
+library(ggthemes)
+library(GGally)
+library(prettydoc)
+library(visdat)
+#install.packages("corrplot")
+library(corrplot)
+
+# data wrangling 
+library(stringr)
+library(tm)
+library(knitr)
+library(dataMaid)
+
+# classification and modeling
+library(class)
+library(e1071)
+library(caret)
+```
+
+```{r, include=FALSE}
+# Get the data
+# setwd("C:/Users/ysalame98/Documents/SMU/Doing DS/CaseStudy2/CaseStudy2DDS")
+MainAttrDF <- read.csv(file = "CaseStudy2-data.csv", header = TRUE)
+NoAttrDF <- read.csv(file = "CaseStudy2CompSet No Attrition.csv", header = TRUE)
+NoMonSalDF <- read.csv(file = "CaseStudy2CompSet No Salary.csv", header = TRUE)
+```
+## Initial Meta Data and Data Profiling Analysis
+### Variables Analysis:
+Examining the Attrition dataset, we note that it consists of 870 observations and 36 attributes/variables.  The original variables consisted of  27 integers and 9 factors. 
+
+
+```{r, echo= FALSE}
+skim(MainAttrDF)
+#Visualize Metadata using visdat library
+# vis_dat(MainAttrDF)
+# Column types Using the inspectdf library
+Types1 <- inspect_types(MainAttrDF)
+show_plot (Types1)
+```
+
+### Missing Values:
+Analysis reveals that there are no missing values to be dealt with.
+
+```{r, echo=FALSE}
+# Missing values Bar Plots
+Nas1 <- inspect_na(MainAttrDF)
+show_plot(Nas1, )
+```
+
+### Data Profiling Analysis and Categorical imbalance
+As illustrated in the charts below, some of the categorical variables appear to be imbalance.  This may need to be dealt with prior to fitting the models.
+
+```{r, echo=FALSE}
+# Categorical Plot
+Catg1 <- inspect_cat(MainAttrDF)
+show_plot (Catg1)
+# Feature Imbalance
+Imb <-  inspect_imb(MainAttrDF)
+show_plot (Imb)
+```
+
+## Variable pruning
+variables that have SD=0, or have one value for example over18=Yes, or provide similar information will be removed from the data set as they are not providing any analytical value.
+Additional pruning was done using correlation analysis.  Heat map was produced to remove attributes that are highly correlated.
+
+```{r, include=FALSE}
+# Rmove Variables that do not provice any analytical value.
+MainAttrDF$EmployeeCount <- NULL # SD = 0
+MainAttrDF$StandardHours <- NULL # SD = 0
+MainAttrDF$Over18 <- NULL        # SD = 0
+MainAttrDF$DailyRate <- NULL     # Provides similar /Duplicative information as Monthly Income
+MainAttrDF$HourlyRate <- NULL    # Provides similar /Duplicative information as Monthly Income  
+MainAttrDF$MonthlyRate <- NULL   # Provides similar /Duplicative information as Monthly Income  
+MainAttrDF$EmployeeNumber <-NULL # This is an identifiers, so it does not contribute to the analysis
+
+#create a DF with numerical values only to study the SD for all atributes at once. and to use in heatmap to identify correlated values
+
+```
+
+## Correlated Attributes:
+Identify correlated attributes using heat map and keep the one that has most influence on attrition
+
+```{r, echo= FALSE, include=FALSE}
+# Draw correlation heat map
+NumMainAttrDF <-MainAttrDF %>% keep(is.numeric) %>% na.omit 
+lapply(NumMainAttrDF,sd) #EmployeeCount, StandardHours have SD=0
+```
+```{r, echo= FALSE}
+NumMainAttrDF %>% cor %>% corrplot("upper", addCoef.col = "black", number.digits = 2,
+			 number.cex = 0.7, method="square",
+			 order="hclust", title="Variable Corr Heat map",
+			 tl.srt=45, tl.cex = 0.8)
+# PercentSalaryHike – PerformanceRate have a correlation of 0.78. Keep PercentSalaryHike
+# YearsWithCurrManager – YearsAtCompany have a correlation of 0.77. Keep YearsAtCompany 
+# YearsWithCurrManager – YearsInCurrentRole have a correlation of 0.71. Both removed.
+# YearsAtCompany - YearsInCurrentRole have a correlation of 0.78. Keep YearsAtCompany
+# TotalWorkingYears – JobLevel have a correlation of 0.78. Both removed. 
+# TotalWorkingYears – MonthlyIncome have a correlation of 0.78.  Keep MonthlyIncome
+# JobLevel – MonthlyIncome have a correlation of 0.95. Remove Joblevel and Keep MonthlyIncome
+# YearsAtCompany - YearSinceLastPromotion have a corroletion of 0.64 since those could related, I will remove yearssincelast promotion.
+```
+
+## Determine which of the numerical (discreet and continuous) attributes are important to attrition
+
+### Age: 
+Age does not seem to have much impact on attrition where the average age of the employees that are is slightly lower than the average age of employees that are staying.  
+
+
+```{r, echo= FALSE}
+# # Age seems to have an impact on attrition, however, I believ
+ ggplot(data = MainAttrDF) + geom_density(aes_string(x = "Age", fill = "Attrition"), alpha = 0.5)
+# ## How does Age and Length of Service affect termination?
+ Ed1 <- MainAttrDF %>% select(Attrition,Age,YearsAtCompany,DistanceFromHome,Education )
+ featurePlot(x=Ed1[,2:3],y=Ed1$Attrition,plot="density",auto.key = list(columns =1))
+ featurePlot(x=Ed1[,2:3],y=Ed1$Attrition,plot="box",auto.key = list(columns = 2))
+```
+
+### Years At Company:
+The age observation closely tracks with the years at the company.  This attribute also shows slight significance as it relates to attrition.  The density chart shows employees tend to mostly leave within years 1-3
+
+```{r, echo= FALSE}
+# YearsWithCurrManager and YearsAtCompany have a correlation of 0.77. Keep YearsAtCompany 1st cut.  Using logic, we can assume that as yearsAtCompany increases, so will the Salary.  Thus I chose to remove yearsAtCompany and Keep MonthlyIncome
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "YearsAtCompany", fill = "Attrition"), alpha = 0.5)
+```
+
+### Years with current manager: 
+The number of years working with the same manager does not seem to have much impact on attrition.
+
+```{r,echo=FALSE}
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "YearsWithCurrManager", fill = "Attrition"), alpha = 0.5)
+MainAttrDF$YearsWithCurrManager <- NULL   # Heat Map shows  minimal Attrition, remove. -- 1st cut
+MainAttrDF$YearsAtCompany <- NULL   # chose to remove yearsAtCompany and Keep MonthlyIncome --2nd cut
+```
+
+### Years in current role: 
+The variable does not seem to have much impact on attrition
+
+```{r, echo= FALSE}
+# YearsWithCurrManager – YearsInCurrentRole have a correlation of 0.71. Keep YearsInCurrentRole 1st cut.  sing logic, we can assume that as YearsInCurrentRole increases, so will the Salary.  Thus I chose to remove yearsAtCompany and Keep MonthlyIncome
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "YearsInCurrentRole", fill = "Attrition"), alpha = 0.5)
+MainAttrDF$YearsInCurrentRole <- NULL
+```
+
+### Total Working Years: 
+This variable seems to have some impact on attrition as the density graph shows the density for the yes and no categories are slightly off indicating some influence.
+
+```{r,echo=FALSE}
+# related, Numerical plot
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "TotalWorkingYears", fill = "Attrition"), alpha = 0.5)
+```
+
+### Monthly Income: 
+This variable seems to have some impact on attrition as the density graph shows the density for the yes and no categories are slightly off indicating some influence.
+```{r, echo=FALSE}
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "MonthlyIncome", fill = "Attrition"), alpha = 0.5)
+```
+
+### Years Since Last Promotion: 
+This variable does not seem to have some impact on attrition as the density graph shows the density for the yes and no categories are almost aligned indicating minimal Influence.
+
+```{r, echo=FALSE}
+#Numerical Plot
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "YearsSinceLastPromotion", fill = "Attrition"), alpha = 0.5)
+MainAttrDF$YearsSinceLastPromotion <- NULL
+# YearsWithCurrManager – YearsAtCompany h
+# YearsAtCompany - YearsInCurrentRole have a correlation of 0.78. Keep YearsAtCompany
+# TotalWorkingYears – JobLevel have a correlation of 0.78. TotalWorkingYears removed. 
+# TotalWorkingYears – MonthlyIncome have a correlation of 0.78.  Keep MonthlyIncome
+# JobLevel – MonthlyIncome have a correlation of 0.95. Remove Joblevel and Keep MonthlyIncome
+# YearsAtCompany - YearSinceLastPromotion have a corroletion of 0.64 since those could related, I will remove yearssincelast promotion.
+# Remove correlated attributes
+
+MainAttrDF$TotalWorkingYears <- NULL
+#MainAttrDF$JobLevel <- NULL  # Will be assessed as a categorical variable
+```
+
+### Distance from home: 
+This attribute appears to have an influence on attrition the density graph shows that people that have shorter commute have a higher probability of staying (not quitting)
+
+```{r, echo= FALSE}
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "DistanceFromHome", fill = "Attrition"), alpha = 0.5)
+Ed1 <- MainAttrDF %>% select(Attrition,DistanceFromHome,Education )
+#featurePlot(x=Ed1[,2],y=Ed1$Attrition,plot="density",auto.key = list(columns =1),labels = c("Distance From home", "Percent"))
+# featurePlot(x=Ed1[,2],y=Ed1$Attrition,plot="box",auto.key = list(columns =1),labels = c("Attrition", "Distance From Home"))
+```
+
+
+### Number Of Companies Worked: 
+Density chart for both attrition categories (Yes/No) is not much different based on the number of companies they've worked at. One exception is Employees who worked at one or two companies seem to have higher tendency to stay with the company.
+
+```{r, echo= FALSE}
+# Numerical plot.
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "NumCompaniesWorked", fill = "Attrition"), alpha = 0.5)
+```
+
+### Percent Salary Hike: 
+Density chart for both attrition categories (Yes/No) is not much different based on percentage salary hike they've received. 
+
+```{r, echo= FALSE}
+# PercentSalaryHike – PerformanceRate have a correlation of 0.78. Density Plot shows no to minimal impact on attrition. Remove both
+# related, Numerical plot
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "PercentSalaryHike", fill = "Attrition"), alpha = 0.5)
+```
+
+### Performance Rating: 
+Density chart for both attrition categories (Yes/No) is not much different based on the performance rating.  One exception is the employees the received a performance rating between 3.0 and 3.125 have tendency to stay with the company. 
+
+```{r, echo= FALSE}
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "PerformanceRating", fill = "Attrition"), alpha = 0.5)
+MainAttrDF$PerformanceRating <- NULL # Denstity graph shows minimal Attrition, remove.
+#MainAttrDF$PercentSalaryHike <- NULL # Denstity graph shows minimal Attrition, remove.
+NumMainAttrDF <-MainAttrDF %>% keep(is.numeric) %>% na.omit 
+# Distribution of the numeric variables
+Numv <- inspect_num(NumMainAttrDF)
+show_plot(Numv)
+# Correlations
+# Corl <- inspect_cor(MainAttrDF)
+# show_plot (Corl)
+```
+```{r, echo= FALSE}
+# convert Numerical categories into factors
+MainAttrDF$F_Education <- as.factor(MainAttrDF$Education )%>% ordered()
+MainAttrDF$F_EnvironmentSatisfaction <- as.factor(MainAttrDF$EnvironmentSatisfaction ) %>% ordered()
+MainAttrDF$F_JobInvolvement <- as.factor(MainAttrDF$JobInvolvement ) %>% ordered()
+MainAttrDF$F_JobLevel <- as.factor(MainAttrDF$JobLevel ) %>% ordered()
+MainAttrDF$F_JobSatisfaction <- as.factor(MainAttrDF$JobSatisfaction ) %>% ordered()
+#MainAttrDF$F_PerformanceRating <- as.factor(MainAttrDF$PerformanceRating) %>% ordered()
+MainAttrDF$F_RelationshipSatisfaction <- as.factor(MainAttrDF$RelationshipSatisfaction) %>% ordered()
+MainAttrDF$F_StockOptionLevel <- as.factor(MainAttrDF$StockOptionLevel ) %>% ordered()
+MainAttrDF$F_TrainingTimesLastYear <- as.factor(MainAttrDF$TrainingTimesLastYear ) %>% ordered()
+MainAttrDF$F_WorkLifeBalance <- as.factor(MainAttrDF$WorkLifeBalance ) %>% ordered()
+```
+
+### Education Level : 
+Density chart for both attrition categories (Yes/No) is not much different based on the Education Level.  One exception is the employees the received a four years degree have tendency to stay with the company. 
+
+```{r, echo= FALSE}
+#cat 5 levels
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "Education", fill = "Attrition"), alpha = 0.5) 
+```
+
+### Relationship Satisfaction: 
+Density chart for both attrition categories (Yes/No) indicate that employee with higher relationship satisfaction, 3 and 4, tend to stay with the company.
+
+```{r, echo= FALSE}
+#cat 4 levels
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "RelationshipSatisfaction", fill = "Attrition"), alpha = 0.5)
+```
+
+### Relationship Satisfaction: 
+Density chart for both attrition categories (Yes/No) indicate that employee with stock option levels of 1 and 2 have a much higher retention rate and tend to stay with the company.
+
+```{r, echo= FALSE}
+#cat 3 levels
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "StockOptionLevel", fill = "Attrition"), alpha = 0.5)
+```
+
+### Work Life Balance: 
+Density chart for both attrition categories (Yes/No) for Work Life Balance is quite similar with the exception for level 3 have a higher retention rate and tend to stay with the company.
+
+```{r, echo= FALSE}
+#cat 4 levels
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "WorkLifeBalance", fill = "Attrition"), alpha = 0.5)
+```
+
+### Job Level: 
+Density chart for both attrition categories (Yes/No) for Job Level is quite different especially for levels 1, 2 and 4.
+
+```{r, echo= FALSE}
+# cat 5 levels
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "JobLevel", fill = "Attrition"), alpha = 0.5)
+```
+
+### Environment Satisfaction: 
+Density chart for both attrition categories (Yes/No) for Environment Satisfaction is quite different especially for levels 2, 3 and 4.  The more satisfaction the higher the retention.
+
+```{r, echo= FALSE}
+#cat 4 levels
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "EnvironmentSatisfaction", fill = "Attrition"), alpha = 0.5)
+```
+
+### Job Involvement: 
+Density chart for both attrition categories (Yes/No) for Job Involvement is somewhat similar the exception is for Job Involvement level 4, those employees have a much higher retention.
+
+```{r, echo= FALSE}
+#cat 4 levels
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "JobInvolvement", fill = "Attrition"), alpha = 0.5)
+```
+
+### Job Satisfaction: 
+Density chart for both attrition categories (Yes/No) for Job satisfaction is very  similar the exception is for Job satisfaction levels 3 and 4 those employees have a higher retention.
+
+```{r, echo= FALSE}
+#cat 4 levels
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "JobSatisfaction", fill = "Attrition"), alpha = 0.5)
+```
+
+### Number of Training classes: 
+Density chart for both attrition categories (Yes/No) for Job Involvement is somewhat similar the exception is for employees who to 3 classes, those employees have a much higher retention.
+
+```{r, echo= FALSE}
+#cat 6 levels
+ggplot(data = MainAttrDF) + geom_density(aes_string(x = "TrainingTimesLastYear", fill = "Attrition"), alpha = 0.5)
+```
+
+
+<!-- # Correlation Heat Map: -->
+<!-- After the removal of correlated variables, the following heat map show the correlation of numerical attributes. -->
+
+<!-- ```{r, echo= FALSE} -->
+<!-- NumMainAttrDF %>% cor %>% corrplot("upper", addCoef.col = "black", number.digits = 2, -->
+<!-- 			 number.cex = 0.7, method="square", -->
+<!-- 			 order="hclust", title="Variable Corr Heat map", -->
+<!-- 			 tl.srt=45, tl.cex = 0.8) -->
+<!-- ``` -->
+
+
+## Categorical Analysis
+### Attrition by Dept: 
+Attrition level for the various dept is consistent and thus does not appear to be relevant to attrition
+
+```{r, echo= FALSE}
+library(dplyr)
+# Create summary DF for Dept and Attrition
+d2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(Department,Attrition) %>% 
+#   dplyr::summarise(count=n()) %>% 
+   dplyr::summarise(count=n()) 
+#  mutate(perc=sum(count))
+
+# Create a summary DF for  Dept
+d1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(Department) %>% 
+#   dplyr::summarise(count=n()) %>% 
+   dplyr::summarise(count=n()) 
+#  mutate(perc=sum(count))
+
+#Create a Summary DF for Attrition By Dept
+mergeDF <- merge(d2, d1, by.x = "Department", by.y = "Department")
+colnames(mergeDF)[2] = "AttritionStatus"
+colnames(mergeDF)[3] = "AttrStatusCnt"
+colnames(mergeDF)[4] = "DeptCount"
+# print("The first 6 observations of the merged file:")
+# head(mergeDF, n=6)
+# Add Percent Calculation 
+mergeDF$Perc <- mergeDF$AttrStatusCnt/mergeDF$DeptCount
+
+ggplot(mergeDF, aes(x = factor(Department), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by Department",x = "Department", y = "percent", fill = "Attrition Status")
+```
+
+### Attrition By Education Field: 
+Attrition across the various education level is consistent and thus does not appear to be relevant to attrition
+
+```{r, echo= FALSE}
+library(dplyr)
+# Create summary DF for EducationField and Attrition
+Ed1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(EducationField,Attrition) %>% 
+   dplyr::summarise(count=n()) 
+# Create a summary DF for  Dept
+Ed2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(EducationField) %>% 
+   dplyr::summarise(count=n()) 
+
+#Create a Summary DF for Attrition By Dept
+mergeEdDF <- merge(Ed1, Ed2, by.x = "EducationField", by.y = "EducationField")
+colnames(mergeEdDF)[2] = "AttritionStatus"
+colnames(mergeEdDF)[3] = "AttrStatusCnt"
+colnames(mergeEdDF)[4] = "EdCount"
+# print("The first 6 observations of the merged file:")
+# Add Percent Calculation 
+mergeEdDF$Perc <- mergeEdDF$AttrStatusCnt/mergeEdDF$EdCount
+# head(mergeEdDF, n=6)
+
+ggplot(mergeEdDF, aes(x = factor(EducationField), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by Education",x = "Education Field", y = "percent", fill = "Attrition Status")
+```
+
+### Attrition By Gender:
+Attrition for both is consistent and thus does not appear to be relevant to attrition
+
+```{r, echo= FALSE}
+# str(MainAttrDF)
+library(dplyr)
+# Create summary DF for EducationField and Attrition
+Ed1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(Gender,Attrition) %>% 
+   dplyr::summarise(count=n()) 
+
+# Create a summary DF for  Dept
+Ed2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(Gender) %>% 
+   dplyr::summarise(count=n()) 
+
+#Create a Summary DF for Attrition By Dept
+mergeEdDF <- merge(Ed1, Ed2, by.x = "Gender", by.y = "Gender")
+colnames(mergeEdDF)[2] = "AttritionStatus"
+colnames(mergeEdDF)[3] = "AttrStatusCnt"
+colnames(mergeEdDF)[4] = "GdCount"
+# print("The first 6 observations of the merged file:")
+# Add Percent Calculation 
+mergeEdDF$Perc <- mergeEdDF$AttrStatusCnt/mergeEdDF$GdCount
+# head(mergeEdDF, n=6)
+
+ggplot(mergeEdDF, aes(x = factor(Gender), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by Gender",x = "Gender", y = "percent", fill = "Attrition Status")
+```
+
+### Attrition By Job Role: 
+This variable appears to play a significant role in attrition whereby the Sales Representative have a high attrition rate of 45.3% nearly twice as high the next job role of Human resources which has a rate of 22.2%.
+
+```{r, echo= FALSE}
+# str(MainAttrDF)
+library(dplyr)
+# Create summary DF for EducationField and Attrition
+Ed1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(JobRole,Attrition) %>% 
+   dplyr::summarise(count=n()) 
+
+# Create a summary DF for  Dept
+Ed2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(JobRole) %>% 
+   dplyr::summarise(count=n()) 
+
+#Create a Summary DF for Attrition By Dept
+mergeEdDF <- merge(Ed1, Ed2, by.x = "JobRole", by.y = "JobRole")
+colnames(mergeEdDF)[2] = "AttritionStatus"
+colnames(mergeEdDF)[3] = "AttrStatusCnt"
+colnames(mergeEdDF)[4] = "GdCount"
+# print("The first 6 observations of the merged file:")
+# Add Percent Calculation 
+mergeEdDF$Perc <- mergeEdDF$AttrStatusCnt/mergeEdDF$GdCount
+# head(mergeEdDF, n=6)
+
+ggplot(mergeEdDF, aes(x = factor(JobRole), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by JobRole",x = "JobRole", y = "percent", fill = "Attrition Status")
+```
+
+### Attrition By Marital Status:
+This variable appears to play a significant role in attrition whereby the singles have a high attrition rate of 26.0% nearly twice as high the married which has a rate of 14.1%.
+
+```{r, echo= FALSE}
+# str(MainAttrDF)
+library(dplyr)
+# Create summary DF for EducationField and Attrition
+Ed1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(MaritalStatus,Attrition) %>% 
+   dplyr::summarise(count=n()) 
+
+# Create a summary DF for  Dept
+Ed2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(MaritalStatus) %>% 
+   dplyr::summarise(count=n()) 
+
+#Create a Summary DF for Attrition By Dept
+mergeEdDF <- merge(Ed1, Ed2, by.x = "MaritalStatus", by.y = "MaritalStatus")
+colnames(mergeEdDF)[2] = "AttritionStatus"
+colnames(mergeEdDF)[3] = "AttrStatusCnt"
+colnames(mergeEdDF)[4] = "GdCount"
+# print("The first 6 observations of the merged file:")
+# Add Percent Calculation 
+mergeEdDF$Perc <- mergeEdDF$AttrStatusCnt/mergeEdDF$GdCount
+# head(mergeEdDF, n=6)
+
+ggplot(mergeEdDF, aes(x = factor(MaritalStatus), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by Marital Status",x = "Marital Status", y = "percent", fill = "Attrition Status")
+``` 
+
+### Attrition By Over Time Status: 
+This variable appears to play a significant role in attrition whereby over time employees have a high attrition rate of 31.7% are three times as likely to be attrition as non-overtime employees at 9.7%.
+
+```{r, echo= FALSE}
+# str(MainAttrDF)
+library(dplyr)
+# Create summary DF for EducationField and Attrition
+Ed1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(OverTime,Attrition) %>% 
+   dplyr::summarise(count=n()) 
+
+# Create a summary DF for  Dept
+Ed2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(OverTime) %>% 
+   dplyr::summarise(count=n()) 
+
+#Create a Summary DF for Attrition By Dept
+mergeEdDF <- merge(Ed1, Ed2, by.x = "OverTime", by.y = "OverTime")
+colnames(mergeEdDF)[2] = "AttritionStatus"
+colnames(mergeEdDF)[3] = "AttrStatusCnt"
+colnames(mergeEdDF)[4] = "GdCount"
+# print("The first 6 observations of the merged file:")
+# Add Percent Calculation 
+mergeEdDF$Perc <- mergeEdDF$AttrStatusCnt/mergeEdDF$GdCount
+# head(mergeEdDF, n=6)
+
+ggplot(mergeEdDF, aes(x = factor(OverTime), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by Over time Status", subtitle = "Over time = non-exempt", x = "Over Time (Yes= non-exempt)", y = "percent", fill = "Attrition Status")
+
+``` 
+
+### Attrition By Stock Option Level:
+This variable appears to play a significant role in attrition whereby employees receiving no stock options (level 0) and those who receive the highest option (level = 3) have a high attrition rate the is almost three times that of employees the receive stock options at level 1 and 2.
+
+```{r, echo= FALSE}
+# Create summary DF for EducationField and Attrition
+Ed1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(StockOptionLevel,Attrition) %>% 
+   dplyr::summarise(count=n()) 
+# Create a summary DF for  Dept
+Ed2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(StockOptionLevel) %>% 
+   dplyr::summarise(count=n()) 
+
+#Create a Summary DF for Attrition By Dept
+mergeEdDF <- merge(Ed1, Ed2, by.x = "StockOptionLevel", by.y = "StockOptionLevel")
+colnames(mergeEdDF)[2] = "AttritionStatus"
+colnames(mergeEdDF)[3] = "AttrStatusCnt"
+colnames(mergeEdDF)[4] = "GdCount"
+# print("The first 6 observations of the merged file:")
+# Add Percent Calculation 
+mergeEdDF$Perc <- mergeEdDF$AttrStatusCnt/mergeEdDF$GdCount
+# head(mergeEdDF, n=6)
+
+ggplot(mergeEdDF, aes(x = factor(StockOptionLevel), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by Stock Option Level",x = "StockOptionLevel", y = "percent", fill = "Attrition Status")
+```
+
+### Attrition By Work Life Balance:
+The majority of work-life balance categories have similar attrition rates.
+
+```{r, echo= FALSE}
+# Create summary DF for EducationField and Attrition
+Ed1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(WorkLifeBalance,Attrition) %>% 
+   dplyr::summarise(count=n()) 
+# Create a summary DF for  Dept
+Ed2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(WorkLifeBalance) %>% 
+   dplyr::summarise(count=n()) 
+
+#Create a Summary DF for Attrition By Dept
+mergeEdDF <- merge(Ed1, Ed2, by.x = "WorkLifeBalance", by.y = "WorkLifeBalance")
+colnames(mergeEdDF)[2] = "AttritionStatus"
+colnames(mergeEdDF)[3] = "AttrStatusCnt"
+colnames(mergeEdDF)[4] = "GdCount"
+# print("The first 6 observations of the merged file:")
+# Add Percent Calculation 
+mergeEdDF$Perc <- mergeEdDF$AttrStatusCnt/mergeEdDF$GdCount
+# head(mergeEdDF, n=6)
+
+ggplot(mergeEdDF, aes(x = factor(WorkLifeBalance), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by Work Life Balance",x = "WorkLifeBalance", y = "percent", fill = "Attrition Status")
+```
+
+### Attrition By Job Level:
+This variable appears to play a significant role in attrition whereby the various job levels have drastically different attrition rates.
+
+```{r, echo= FALSE}
+# Create summary DF for EducationField and Attrition
+Ed1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(JobLevel,Attrition) %>% 
+   dplyr::summarise(count=n()) 
+
+# Create a summary DF for  Dept
+Ed2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(JobLevel) %>% 
+   dplyr::summarise(count=n()) 
+
+#Create a Summary DF for Attrition By Dept
+mergeEdDF <- merge(Ed1, Ed2, by.x = "JobLevel", by.y = "JobLevel")
+colnames(mergeEdDF)[2] = "AttritionStatus"
+colnames(mergeEdDF)[3] = "AttrStatusCnt"
+colnames(mergeEdDF)[4] = "GdCount"
+# Add Percent Calculation 
+mergeEdDF$Perc <- mergeEdDF$AttrStatusCnt/mergeEdDF$GdCount
+# head(mergeEdDF, n=6)
+
+ggplot(mergeEdDF, aes(x = factor(JobLevel), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by Job Level",x = "JobLevel", y = "percent", fill = "Attrition Status")
+```
+
+### Attrition By Environment Satisfaction:
+The attrition rate is mostly consistent across the various levels
+
+```{r, echo= FALSE}
+# Create summary DF for EducationField and Attrition
+Ed1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(EnvironmentSatisfaction,Attrition) %>% 
+   dplyr::summarise(count=n()) 
+
+# Create a summary DF for  Dept
+Ed2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(EnvironmentSatisfaction) %>% 
+   dplyr::summarise(count=n()) 
+
+#Create a Summary DF for Attrition By Dept
+mergeEdDF <- merge(Ed1, Ed2, by.x = "EnvironmentSatisfaction", by.y = "EnvironmentSatisfaction")
+colnames(mergeEdDF)[2] = "AttritionStatus"
+colnames(mergeEdDF)[3] = "AttrStatusCnt"
+colnames(mergeEdDF)[4] = "GdCount"
+# Add Percent Calculation 
+mergeEdDF$Perc <- mergeEdDF$AttrStatusCnt/mergeEdDF$GdCount
+# head(mergeEdDF, n=6)
+
+ggplot(mergeEdDF, aes(x = factor(EnvironmentSatisfaction), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by Environment Satisfaction",x = "EnvironmentSatisfaction", y = "percent", fill = "Attrition Status")
+```
+
+### Attrition By Job Involvement:
+This variable appears to play a significant role in attrition whereby employees receiving low job involvement (level 1) are 4 times as likely to be attrition (46.9%) as those in the next level of job involvement whose attrition rate is (19.3%)
+
+```{r, echo= FALSE}
+# Create summary DF for JobInvolvement and Attrition
+Ed1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(JobInvolvement,Attrition) %>% 
+   dplyr::summarise(count=n()) 
+
+# Create a summary DF for  Dept
+Ed2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(JobInvolvement) %>% 
+   dplyr::summarise(count=n()) 
+
+#Create a Summary DF for Attrition By Dept
+mergeEdDF <- merge(Ed1, Ed2, by.x = "JobInvolvement", by.y = "JobInvolvement")
+colnames(mergeEdDF)[2] = "AttritionStatus"
+colnames(mergeEdDF)[3] = "AttrStatusCnt"
+colnames(mergeEdDF)[4] = "GdCount"
+# Add Percent Calculation 
+mergeEdDF$Perc <- mergeEdDF$AttrStatusCnt/mergeEdDF$GdCount
+
+ggplot(mergeEdDF, aes(x = factor(JobInvolvement), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by Job Involvement",x = "JobInvolvement", y = "percent", fill = "Attrition Status")
+```
+
+### Attrition by Job Satisfaction:
+This variable does not seem to have minimal influence on attrition.
+
+```{r, echo= FALSE}
+# Create summary DF for JobSatisfaction and Attrition
+Ed1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(JobSatisfaction,Attrition) %>% 
+   dplyr::summarise(count=n()) 
+
+# Create a summary DF for  Dept
+Ed2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(JobSatisfaction) %>% 
+   dplyr::summarise(count=n()) 
+
+#Create a Summary DF for Attrition By Dept
+mergeEdDF <- merge(Ed1, Ed2, by.x = "JobSatisfaction", by.y = "JobSatisfaction")
+colnames(mergeEdDF)[2] = "AttritionStatus"
+colnames(mergeEdDF)[3] = "AttrStatusCnt"
+colnames(mergeEdDF)[4] = "GdCount"
+# Add Percent Calculation 
+mergeEdDF$Perc <- mergeEdDF$AttrStatusCnt/mergeEdDF$GdCount
+
+ggplot(mergeEdDF, aes(x = factor(JobSatisfaction), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by Job Satisfaction",x = "JobSatisfaction", y = "percent", fill = "Attrition Status")
+```
+
+### Attrition by Training Times Last Year:
+This variable appears to play a significant role in attrition whereby employees receiving different levels of training have different attrition rates.
+
+```{r, echo= FALSE}
+# Create summary DF for TrainingTimesLastYear and Attrition
+Ed1 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(TrainingTimesLastYear,Attrition) %>% 
+   dplyr::summarise(count=n()) 
+# Create a summary DF for  TrainingTimesLastYear
+Ed2 <- as.data.frame(MainAttrDF) %>% 
+   dplyr::group_by(TrainingTimesLastYear) %>% 
+   dplyr::summarise(count=n()) 
+
+#Create a Summary DF for Attrition By TrainingTimesLastYear
+mergeEdDF <- merge(Ed1, Ed2, by.x = "TrainingTimesLastYear", by.y = "TrainingTimesLastYear")
+colnames(mergeEdDF)[2] = "AttritionStatus"
+colnames(mergeEdDF)[3] = "AttrStatusCnt"
+colnames(mergeEdDF)[4] = "GdCount"
+# Add Percent Calculation 
+mergeEdDF$Perc <- mergeEdDF$AttrStatusCnt/mergeEdDF$GdCount
+
+ggplot(mergeEdDF, aes(x = factor(TrainingTimesLastYear), y = (Perc*100), fill = factor(AttritionStatus))) +
+geom_col() +
+    geom_text(aes(
+            label = scales::percent( (Perc)  ), group = AttritionStatus), 
+            position = position_stack( vjust = 0.5)) +
+    labs(title = "Attrition % by Training Times Last Year",x = "TrainingTimesLastYear", y = "percent", fill = "Attrition Status")
+```
+
+### Classify using the KNN:
+I tried using Under sample, Over Sample and both none of the balanced training data produced the desired effect, to I decided to use the original data set. Using the analysis of the categorical and continuous variables conducted above, the following variables were selected to fit a KNN Model: StockOptionLevel, DistanceFromHome, MonthlyIncome, JobInvolvement.  Through multiple iteration of K,  Seed optimization, and different train/test split ratios the following parameters were the most optimal: 
+K= 7, Split = 85%, and Seed = 100.  With these parameters, the model was fitted and trained and the below are the outcomes: prediction Accuracy = 86.1%,  Specificity = 75% Sensitivity = 86.5%
+
+```{r, echo= FALSE}
+# Approach: 
+# 1- Use Training sets above (Under, Over and Both)
+# 2- Find the best value of K Using the double Loop 
+
+# Declare Variables
+IT = 100 # Number of iterations to train
+NK = 100 #Number of different K to try
+Acc = matrix(nrow = NK) # Create Matrix to hold the accuracy data with size of I X NK
+Spec = matrix(nrow = NK) # Create Matrix to hold the specificity data with size of I X NK
+Sens = matrix(nrow =  NK) # Create Matrix to hold the sensitivity data with size of I X NK
+
+i=0  # initializw
+
+splitPct = 0.85
+# Select column deemed most influencial based on EDA above.
+AttPrd <- MainAttrDF %>% select(Attrition,StockOptionLevel,DistanceFromHome,MonthlyIncome,JobInvolvement)
+
+# Build the Model and optimize the seed.
+  for(i in 1:NK)
+  {
+    set.seed(i)
+    trainIndices = sample(1:dim(AttPrd)[1],round(splitPct * dim(AttPrd)[1])) 
+    train = AttPrd[trainIndices,]
+    test = AttPrd[-trainIndices,]
+    classifications = knn(train[,c(2,3,4,5)],test[,c(2,3,4,5)], train$Attrition, prob = TRUE, k = 7)
+    #table(classifications,test$Attrition)
+    CM = confusionMatrix(table(test$Attrition,classifications))
+    # for each itirriation and K value capture the accuracy
+    Acc[i] = CM$overall[1]
+    # for each itirriation and K value capture the Sensitivity 
+    Sens[i] = CM$byClass[1]
+    # for each itirriation and K value capture the Specificity 
+    Spec[i]= CM$byClass[2]
+        }
+# Find the mean for each ittiratio and K values.
+CM 
+MeanAcc = rowMeans(Acc)
+MeanSpec = rowMeans(Spec)
+MeanSens = rowMeans(Sens)
+# which.max(MeanAcc)
+# which.max(MeanAcc)
+# which.max(MeanSpec)
+#Plot the Accuracy vs the K values
+plot(seq(1,NK,1),MeanAcc, type="h", main = "Seed values vs Accuracy (Optimal K=7)",xlab = "Seed Values", ylab = "Accuracy" )
+plot(seq(1,NK,1),MeanSpec, type="h", main = "Seed values vs Specificity (Optimal K=7)",xlab = "Seed Values", ylab = "Specificity" )
+plot(seq(1,NK,1),MeanSens, type="h", main = "Seed values vs Sensitivity (Optimal K=7)",xlab = "Seed Values", ylab = "Sensitivity" )
+```
+### Predict the Attrition from File
+```{r, echo=FALSE, include=TRUE}
+Pr_test <- NoAttrDF 
+Pr_test$Attrition <- Pr_test$Attrition <- NA
+Pr_test$Attrition <- as.factor(Pr_test$Attrition)
+
+Pr_test$Attrition <- knn(train[,c(2,3,4,5)],Pr_test[,c("StockOptionLevel","DistanceFromHome","MonthlyIncome","JobLevel")],cl = train$Attrition, prob = TRUE, k = 7)
+write.csv(Pr_test, "Case2PredictionsSalamah Attrition.csv")
+```
+
+## Naive-Bayes Model:
+This model produced similar results as the KNN model but the accuracy was lower, 82% versus 86% and the specificity came out to be 0.  As a result, I decided to use the KNN model.
+
+```{r, echo= FALSE}
+# Declare Variables
+
+N_K = 100 #Number of different K to try
+N_Acc = matrix(nrow = N_K) # Create Matrix to hold the accuracy data with size of  N_K X 1
+N_Spec = matrix(nrow = N_K) # Create Matrix to hold the specificity data with size of N_K X 1
+N_Sens = matrix(nrow = N_K) # Create Matrix to hold the sensitivity data with size of N_K X 1
+i=0  # initializw
+
+N_splitPct = 0.85
+# Select column deemed most influencial based on EDA above.
+N_AttPrd <- MainAttrDF %>% select(Attrition,StockOptionLevel,DistanceFromHome,MonthlyIncome,JobLevel)
+
+# Build the Model and optimize the seed.
+  for(i in 1:N_K)
+  {
+    set.seed(i)
+    N_trainIndices = sample(1:dim(N_AttPrd)[1],round(splitPct * dim(N_AttPrd)[1])) 
+    N_train = N_AttPrd[N_trainIndices,]
+    N_test = N_AttPrd[-N_trainIndices,]
+    N_model = naiveBayes(N_train[,c(2,3,4,5)],factor(N_train$Attrition, labels = c("No","Yes")))
+    N_CM = confusionMatrix(table(
+                                factor(N_test$Attrition, labels = c("No","Yes")
+                                       ), 
+                                predict( N_model, N_test[,c(2,3,4,5)])  
+                                )
+                           )
+    # for each itirriation value capture the accuracy
+     N_Acc[i] = N_CM$overall[1]
+    # for each itirriation value capture the Sensitivity 
+    N_Sens[i] = N_CM$byClass[1]
+    # for each itirriation value capture the Specificity 
+    N_Spec[i]= N_CM$byClass[2]
+  }
+# Display Confusion Matrix
+N_CM 
+```
+
+## Linear Regression
+### Validate assumptions:  
+The GGPLOTS and point plots confirm the assumptions.  There is no evidence against normal distributions. There does not seem to be much evidence against a linear relationship between the means and there does not seem to be much evidence of non-constant standard deviation of the normal distributions.
+
+```{r, echo= FALSE}
+#install.packages("Metrics")
+library(Metrics)
+MainAttrDF <- read.csv(file = "CaseStudy2-data.csv", header = TRUE)
+NumMainAttrDF <-MainAttrDF %>% keep(is.numeric) %>% na.omit 
+NoAttrDF <- read.csv(file = "CaseStudy2CompSet No Attrition.csv", header = TRUE)
+NoMonSalDF <- read.csv(file = "CaseStudy2CompSet No Salary.csv", header = TRUE)
+
+# Monthly Income
+NumMainAttrDF %>% ggplot(aes(x = TotalWorkingYears, y = MonthlyIncome)) + geom_point(position="jitter") + geom_smooth(method = "lm")+ labs(title = "Monthly Income vs Total Working Years",x = "Total Working Years", y = "Monthly Income")
+NumMainAttrDF %>% ggplot(aes(x = JobLevel, y = MonthlyIncome)) + geom_point(position="jitter") + geom_smooth(method = "lm")+ labs(title = "Monthly Income vs Job Level",x = "Job level", y = "Monthly Income")
+NumMainAttrDF %>% ggplot(aes(x = YearsAtCompany, y = MonthlyIncome)) + geom_point(position="jitter") + geom_smooth(method = "lm")+ labs(title = "Monthly Income vs Years At Company",x = "Years At Company", y = "Monthly Income")
+NumMainAttrDF %>% ggplot(aes(y = MonthlyIncome, x = DistanceFromHome)) + geom_point(position="jitter") + geom_smooth(method = "lm")+ labs(title = "Monthly Income vs Distance From Home",x = "Distance From Home", y = "Monthly Income")
+NumMainAttrDF %>% ggplot(aes(y = MonthlyIncome, x = Age)) + geom_point(position="jitter") + geom_smooth(method = "lm")+ labs(title = "Monthly Income vs Age",x = "Age", y = "Monthly Income")
+NumMainAttrDF %>% select(MonthlyIncome,TotalWorkingYears,YearsAtCompany,DistanceFromHome,JobLevel,Age) %>% ggpairs()
+```
+
+### Fit the Linear Regression Model using significant variables identified above. Specifically:
+* Years At company
+* Total Working Years
+* Job Level
+```{r, echo= FALSE}
+# Fit the model using linear model
+fit = lm(MonthlyIncome~YearsAtCompany + TotalWorkingYears + JobLevel, data= NumMainAttrDF)
+rmse(NumMainAttrDF$MonthlyIncome, predict(fit, NumMainAttrDF))
+summary(fit)
+confint(fit)
+```
+
+### Predict Salary
+
+```{r, echo= FALSE}
+# Predict Monthly Salary
+NoMonSalDF$MonthlyInc = predict(fit,NoMonSalDF, interval = "confidence")
+write.csv(NoMonSalDF, "Case2PredictionsSalamah Salary.csv")
+```
